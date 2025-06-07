@@ -1,0 +1,35 @@
+# name: test/sql/wizard.test
+# description: test wizard extension
+# group: [wizard]
+
+# Before we load the extension, this will fail
+statement error
+SELECT * FROM wizard('nflx stock data');
+----
+Catalog Error: Table Function with name wizard does not exist!
+
+# Require statement will ensure the extension is loaded
+require wizard
+
+# Test the wizard function with a natural language query
+query IIRRRRR
+SELECT * FROM wizard('nflx stock data by day the past year');
+----
+2024-01-02	NFLX	474.85	481.70	472.50	478.99	3654200
+2024-01-03	NFLX	478.99	482.30	475.65	480.12	3234100
+2024-01-04	NFLX	480.12	485.40	479.20	483.78	3901000
+2024-01-05	NFLX	483.78	488.90	482.50	487.15	4123400
+2024-01-08	NFLX	487.15	492.30	486.00	490.82	3789200
+
+# Test with aggregation
+query I
+SELECT COUNT(*) FROM wizard('nflx stock data');
+----
+5
+
+# Test with filtering
+query IRR
+SELECT date, close, volume FROM wizard('nflx data') WHERE close > 485;
+----
+2024-01-05	487.15	4123400
+2024-01-08	490.82	3789200

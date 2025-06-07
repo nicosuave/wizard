@@ -1,0 +1,202 @@
+Metadata-Version: 2.4
+Name: duckdb-wizard
+Version: 0.1.0
+Summary: Natural language data querying for DuckDB using LLMs
+Author: DuckDB Wizard Contributors
+License: MIT
+Project-URL: Homepage, https://github.com/yourusername/duckdb-wizard
+Project-URL: Issues, https://github.com/yourusername/duckdb-wizard/issues
+Keywords: duckdb,llm,data,sql,natural-language
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: duckdb>=1.3.0
+Provides-Extra: basic
+Requires-Dist: requests>=2.31.0; extra == "basic"
+Requires-Dist: pandas>=2.0.0; extra == "basic"
+Requires-Dist: yfinance>=0.2.28; extra == "basic"
+Provides-Extra: advanced
+Requires-Dist: numpy>=1.26.0; extra == "advanced"
+Requires-Dist: beautifulsoup4>=4.12.0; extra == "advanced"
+Requires-Dist: lxml>=4.9.0; extra == "advanced"
+Requires-Dist: httpx>=0.25.0; extra == "advanced"
+Requires-Dist: python-dateutil>=2.8.0; extra == "advanced"
+Provides-Extra: viz
+Requires-Dist: matplotlib>=3.7.0; extra == "viz"
+Requires-Dist: plotly>=5.17.0; extra == "viz"
+Requires-Dist: tabulate>=0.9.0; extra == "viz"
+Requires-Dist: rich>=13.0.0; extra == "viz"
+Provides-Extra: all
+Requires-Dist: requests>=2.31.0; extra == "all"
+Requires-Dist: pandas>=2.0.0; extra == "all"
+Requires-Dist: numpy>=1.26.0; extra == "all"
+Requires-Dist: yfinance>=0.2.28; extra == "all"
+Requires-Dist: beautifulsoup4>=4.12.0; extra == "all"
+Requires-Dist: lxml>=4.9.0; extra == "all"
+Requires-Dist: httpx>=0.25.0; extra == "all"
+Requires-Dist: python-dateutil>=2.8.0; extra == "all"
+Requires-Dist: matplotlib>=3.7.0; extra == "all"
+Requires-Dist: plotly>=5.17.0; extra == "all"
+Requires-Dist: tabulate>=0.9.0; extra == "all"
+Requires-Dist: rich>=13.0.0; extra == "all"
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4.0; extra == "dev"
+Requires-Dist: black>=23.0.0; extra == "dev"
+Requires-Dist: ruff>=0.1.0; extra == "dev"
+Requires-Dist: mypy>=1.5.0; extra == "dev"
+
+# 🧙‍♂️ DuckDB Wizard - Natural Language Data Queries
+
+Query any data using natural language in DuckDB! Powered by LLMs (OpenAI/Anthropic) and Python.
+
+## Examples
+
+```sql
+-- Load the extension
+LOAD 'path/to/wizard.duckdb_extension';
+
+-- Query stock data
+SELECT * FROM wizard('Apple stock price last 30 days');
+
+-- Get weather data  
+SELECT * FROM wizard('weather in San Francisco');
+
+-- Fetch cryptocurrency prices
+SELECT * FROM wizard('Bitcoin and Ethereum prices in USD');
+
+-- Complex queries work too!
+SELECT date, ticker, close 
+FROM wizard('tech stocks AAPL MSFT GOOGL last week')
+WHERE close > 500
+ORDER BY date DESC;
+```
+
+## Installation
+
+### 1. Set up Python environment
+
+Install the required Python packages that the LLM-generated code will use:
+
+```bash
+# Basic installation (recommended)
+pip install requests pandas yfinance
+
+# Or install all supported packages
+pip install requests pandas numpy yfinance beautifulsoup4 lxml httpx python-dateutil
+
+# Or use the pyproject.toml
+pip install -e ".[all]"
+```
+
+### 2. Set your LLM API key
+
+```bash
+# For OpenAI
+export OPENAI_API_KEY="your-openai-api-key"
+
+# OR for Anthropic  
+export ANTHROPIC_API_KEY="your-anthropic-api-key"
+```
+
+### 3. Build the extension
+
+```bash
+# Clone with submodules
+git clone --recurse-submodules https://github.com/yourusername/duckdb-wizard
+cd duckdb-wizard
+
+# Configure and build
+make configure
+make release
+```
+
+## Supported Python Packages
+
+The extension supports the following pre-imported packages:
+
+- **requests** - HTTP requests and web APIs
+- **pandas** (as pd) - Data manipulation and analysis
+- **numpy** (as np) - Numerical computing
+- **yfinance** (as yf) - Yahoo Finance data
+- **beautifulsoup4** (BeautifulSoup) - Web scraping
+- **httpx** - Modern HTTP client
+- **Standard library**: datetime, json, re, math, urllib, csv, etc.
+
+## Usage
+
+### In DuckDB CLI
+
+```bash
+duckdb -unsigned
+
+LOAD 'build/release/wizard.duckdb_extension';
+SELECT * FROM wizard('show me Tesla stock data for the last week');
+```
+
+### In Python
+
+```python
+import duckdb
+
+# Connect with unsigned extensions allowed
+conn = duckdb.connect(':memory:', config={'allow_unsigned_extensions': 'true'})
+
+# Load the extension
+conn.execute("LOAD 'build/release/wizard.duckdb_extension'")
+
+# Query any data!
+df = conn.execute("SELECT * FROM wizard('cryptocurrency prices')").df()
+print(df)
+```
+
+### Using the demo script
+
+```bash
+# Interactive wizard interface
+python wizard.py
+
+# Or with uv (auto-installs dependencies)
+uv run wizard_demo.py
+```
+
+## How it Works
+
+1. Your natural language query is sent to an LLM (OpenAI or Anthropic)
+2. The LLM generates Python code to fetch the requested data
+3. The code is executed in an embedded Python environment
+4. Results are returned as a DuckDB table that you can query with SQL
+
+## Troubleshooting
+
+- **"Package not installed"**: Install the required Python packages listed above
+- **"No API key found"**: Set your OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable
+- **"Extension not found"**: Make sure you've built the extension with `make release`
+- **Rate limits**: The extension uses real API calls, so you may hit rate limits with many queries
+
+## Development
+
+### Requirements
+- Rust toolchain
+- Python 3.8+
+- Make
+- Git
+
+### Building from source
+```bash
+# Clone with submodules
+git clone --recurse-submodules https://github.com/yourusername/duckdb-wizard
+cd duckdb-wizard
+
+# Configure and build
+make configure
+make release
+```
+
+### Testing
+```bash
+make test_debug   # Test debug build
+make test_release # Test release build
+```
+
+## License
+
+MIT License - see LICENSE file for details.

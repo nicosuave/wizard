@@ -1,0 +1,7 @@
+README.md
+pyproject.toml
+src/duckdb_wizard.egg-info/PKG-INFO
+src/duckdb_wizard.egg-info/SOURCES.txt
+src/duckdb_wizard.egg-info/dependency_links.txt
+src/duckdb_wizard.egg-info/requires.txt
+src/duckdb_wizard.egg-info/top_level.txt
