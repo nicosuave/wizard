@@ -1,6 +1,8 @@
-# 🧙‍♂️ DuckDB Wizard - Natural Language Data Queries
+# DuckDB Wizard
 
 Did you ever want to `SELECT * FROM clean_data_you_think_exists`? Well, now you can!
+
+A DuckDB extension that lets you query any data using natural language.
 
 > ⚠️ **WARNING: HIGHLY EXPERIMENTAL** ⚠️
 > 
