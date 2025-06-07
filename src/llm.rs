@@ -9,7 +9,8 @@ use chrono;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LLMResponse {
-    pub python_code: String,
+    #[serde(alias = "python_code", alias = "javascript_code")]
+    pub javascript_code: String,
     pub schema: Vec<ColumnSchema>,
 }
 
@@ -96,40 +97,53 @@ User query: "{}"
 IMPORTANT: If the user asks for data with relative time periods (e.g., "last 7 days", "past week", "yesterday"), 
 calculate the dates based on the current date above. Do NOT use fixed dates.
 
-Generate Python code that fetches this data and returns it as a list of dictionaries.
+Generate JavaScript code that fetches this data and returns it as an array of objects.
 Also provide the schema of the data that will be returned.
 
 IMPORTANT RULES:
-1. The Python code should define a function called `fetch_data()` that returns a list of dictionaries
-2. Each dictionary represents a row of data
-3. For HTTP requests, use the built-in http_get(url) function (already available, no import needed)
-4. CRITICAL: You CANNOT import these modules: json, datetime, random, math, urllib, requests
-5. For JSON parsing, use eval() carefully: eval(response.replace('true','True').replace('false','False').replace('null','None'))
-6. ALWAYS use REAL, FREE APIs. NEVER make up API endpoints. Examples of real free APIs:
-   - Weather: wttr.in (e.g., http_get('https://wttr.in/Seattle?format=j1'))
-   - Stock data: Yahoo Finance via yfinance API endpoints
-   - Crypto: CoinGecko free tier (e.g., http_get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'))
-   - IP info: http_get('https://ipapi.co/json/')
-   - Jokes: http_get('https://official-joke-api.appspot.com/random_joke')
-7. If no suitable FREE API exists for the query, return an error:
-   return [{{'error': 'No free API available', 'message': 'Cannot find a free API for: [query description]'}}]
-8. If API call fails, return the error details:
-   try:
-       response = http_get(url)
-       # process response
-   except Exception as e:
-       return [{{'error': 'API call failed', 'message': str(e), 'url': url}}]
-9. NEVER return empty list [] - always return error details if something goes wrong
-10. IMPORTANT: Include ALL relevant columns that make sense for the query:
+1. The JavaScript code should define an async function called `fetch_data()` that returns an array of objects
+2. Each object represents a row of data
+3. Use the built-in fetch() function for HTTP requests (Deno has it built-in)
+4. You have access to all modern JavaScript/TypeScript features and Deno APIs
+5. Parse JSON responses with await response.json()
+6. For external packages, use Deno's npm specifier to import npm packages directly:
+   - import package from "npm:package-name@version"
+   - Example: import dayjs from "npm:dayjs@1.11.10"
+   - Example: import _ from "npm:lodash@4.17.21"
+7. Prefer using real npm packages when they provide better functionality:
+   - For stock data: import yahooFinance from "npm:yahoo-finance2"
+   - For crypto data: Consider using a proper SDK if available
+   - Date formatting: import dayjs from "npm:dayjs" or import { format } from "npm:date-fns"
+   - Data processing: import _ from "npm:lodash" for complex operations
+   - CSV parsing: import { parse } from "npm:csv-parse/sync"
+   - However, for simple HTTP APIs, fetch() is often sufficient
+8. ALWAYS use REAL, FREE APIs. NEVER make up API endpoints. Examples of real free APIs:
+   - Weather: wttr.in (e.g., await fetch('https://wttr.in/Seattle?format=j1'))
+   - Earthquakes: USGS (e.g., await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson'))
+   - Crypto: CoinGecko free tier (e.g., await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'))
+   - IP info: await fetch('https://ipapi.co/json/')
+   - Jokes: await fetch('https://official-joke-api.appspot.com/random_joke')
+9. If no suitable FREE API exists for the query, return an error:
+   return [{error: 'No free API available', message: 'Cannot find a free API for: [query description]'}]
+10. If API call fails, return the error details:
+   try {
+       const response = await fetch(url);
+       const data = await response.json();
+       // process data
+   } catch (e) {
+       return [{error: 'API call failed', message: e.message, url: url}];
+   }
+11. NEVER return empty array [] - always return error details if something goes wrong
+12. IMPORTANT: Include ALL relevant columns that make sense for the query:
     - For weather: include date, location, temperature, conditions, humidity, wind, etc.
-    - For stocks: include date/time, symbol, open, high, low, close, volume
+    - For earthquakes: include magnitude, place, time, depth, coordinates, etc.
     - For crypto: include coin name, symbol, price, market cap, 24h change if available
     - Always prefer more complete data over minimal responses
-11. The schema should match the data exactly and include all columns you return
+13. The schema should match the data exactly and include all columns you return
 
 Return your response as JSON in this exact format:
 {{
-    "python_code": "def fetch_data():\n    # Your code here\n    return data",
+    "javascript_code": "async function fetch_data() {{\n    // Your code here\n    return data;\n}}",
     "schema": [
         {{"name": "column1", "data_type": "varchar"}},
         {{"name": "column2", "data_type": "double"}}
@@ -138,17 +152,17 @@ Return your response as JSON in this exact format:
 
 Supported data types: varchar, double, bigint, date
 
-Example for "tech stock prices":
+Example for "recent earthquakes":
 {{
-    "python_code": "def fetch_data():\n    import yfinance as yf\n    import datetime\n    \n    end_date = datetime.datetime.now()\n    start_date = end_date - datetime.timedelta(days=7)\n    \n    tickers = ['AAPL', 'GOOGL', 'MSFT']\n    data = []\n    \n    for ticker in tickers:\n        stock = yf.Ticker(ticker)\n        hist = stock.history(start=start_date, end=end_date)\n        \n        for date, row in hist.iterrows():\n            data.append({{\n                'date': date.strftime('%Y-%m-%d'),\n                'ticker': ticker,\n                'open': float(row['Open']),\n                'high': float(row['High']),\n                'low': float(row['Low']),\n                'close': float(row['Close']),\n                'volume': int(row['Volume'])\n            }})\n    \n    return data",
+    "javascript_code": "async function fetch_data() {{\n    const response = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_month.geojson');\n    const data = await response.json();\n    \n    return data.features.map(feature => ({{\n        magnitude: feature.properties.mag,\n        place: feature.properties.place,\n        time: new Date(feature.properties.time).toISOString(),\n        depth: feature.geometry.coordinates[2],\n        latitude: feature.geometry.coordinates[1],\n        longitude: feature.geometry.coordinates[0],\n        type: feature.properties.type\n    }}));\n}}",
     "schema": [
-        {{"name": "date", "data_type": "varchar"}},
-        {{"name": "ticker", "data_type": "varchar"}},
-        {{"name": "open", "data_type": "double"}},
-        {{"name": "high", "data_type": "double"}},
-        {{"name": "low", "data_type": "double"}},
-        {{"name": "close", "data_type": "double"}},
-        {{"name": "volume", "data_type": "bigint"}}
+        {{"name": "magnitude", "data_type": "double"}},
+        {{"name": "place", "data_type": "varchar"}},
+        {{"name": "time", "data_type": "varchar"}},
+        {{"name": "depth", "data_type": "double"}},
+        {{"name": "latitude", "data_type": "double"}},
+        {{"name": "longitude", "data_type": "double"}},
+        {{"name": "type", "data_type": "varchar"}}
     ]
 }}"#,
             current_time,

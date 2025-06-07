@@ -13,7 +13,7 @@ A DuckDB extension that lets you query any data using natural language.
 > - API calls to LLMs incur costs - monitor your usage
 > - Proceed at your own risk!
 
-Query any data using natural language in DuckDB! Powered by LLMs (OpenAI/Anthropic) and Python.
+Query any data using natural language in DuckDB! Powered by LLMs (OpenAI/Anthropic) and Deno.
 
 ## Quick Start
 
@@ -61,20 +61,16 @@ ORDER BY magnitude DESC;
 
 ### 1. Requirements
 
-- Python 3.8+ (required for PyO3 integration)
-- DuckDB Python package
+- Deno runtime (for JavaScript execution)
 - Rust toolchain (for building)
 
 ```bash
-# Install Python if needed
-# macOS: brew install python3
-# Ubuntu: sudo apt install python3 python3-pip
-
-# Install DuckDB
-pip install duckdb
+# Install Deno
+# macOS: brew install deno
+# Ubuntu: curl -fsSL https://deno.land/install.sh | sh
 ```
 
-Note: The extension uses Python for code execution but handles all HTTP requests internally via Rust - no additional Python packages needed!
+Note: The extension uses Deno for JavaScript execution with full npm package support!
 
 ### 2. Set your LLM API key
 
@@ -105,23 +101,22 @@ make release
 The wizard extension operates with significant constraints:
 
 **What it CAN do:**
-- Make HTTP/HTTPS requests via Rust-bridged client
-- Parse JSON responses from web APIs
+- Make HTTP/HTTPS requests using Deno's built-in fetch
+- Import and use any npm package via Deno's npm specifier
+- Parse JSON responses natively
 - Transform API responses into DuckDB tables
-- Execute basic Python (no imports allowed)
+- Execute modern JavaScript/TypeScript code
 - Cache responses for performance (60x speedup)
 
 **What it CANNOT do:**
-- Import ANY Python packages (no pandas, numpy, json, datetime, etc.)
-- Use Python standard library modules
-- Access the filesystem
-- Make database connections
-- Install Python packages
+- Access the local filesystem (sandboxed)
+- Make direct database connections
+- Execute arbitrary system commands
 
-The extension works by having the LLM generate Python code that uses only:
-- Basic Python syntax (loops, conditionals, list comprehensions)
-- A special `http_get()` function injected by Rust
-- String manipulation and basic data types
+The extension works by having the LLM generate JavaScript code that:
+- Uses Deno's built-in fetch() for HTTP requests
+- Can import npm packages like `npm:yahoo-finance2` or `npm:dayjs`
+- Returns data as an array of objects
 
 ### Response Caching
 
@@ -145,7 +140,9 @@ LOAD 'build/release/wizard.duckdb_extension';
 SELECT * FROM wizard('show me Tesla stock data for the last week');
 ```
 
-### In Python
+### Using from Python (via DuckDB)
+
+If you want to use the extension from Python, install DuckDB: `pip install duckdb`
 
 ```python
 import duckdb
@@ -174,12 +171,12 @@ python wizard_demo.py
 ## How it Works
 
 1. Your natural language query is sent to an LLM (OpenAI or Anthropic)
-2. The LLM generates constrained Python code using only basic syntax
-3. HTTP requests are handled by Rust code bridged to Python
-4. The code is executed in a restricted Python environment
+2. The LLM generates JavaScript code that fetches the requested data
+3. The code is executed in a sandboxed Deno environment
+4. Deno handles all HTTP requests and npm package imports
 5. Results are returned as a DuckDB table that you can query with SQL
 
-The key innovation is that all HTTP functionality is implemented in Rust and exposed to Python as a simple `http_get()` function, eliminating Python package dependencies entirely.
+The extension leverages Deno's secure runtime and built-in fetch API, plus its ability to import npm packages directly.
 
 ## Troubleshooting
 

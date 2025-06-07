@@ -23,7 +23,7 @@ crate-type = ["staticlib"]
 duckdb = { version = "1.3.0", features = ["vtab-loadable"] }
 duckdb-loadable-macros = "0.1.5"
 libduckdb-sys = { version = "1.3.0", features = ["loadable-extension"] }
-pyo3 = { version = "0.22", features = ["auto-initialize"] }
+# Removed pyo3 - using Deno instead
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

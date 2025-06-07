@@ -3,7 +3,7 @@ extern crate duckdb_loadable_macros;
 extern crate libduckdb_sys;
 
 mod llm;
-mod python_executor;
+mod deno_executor;
 
 use duckdb::{
     core::{DataChunkHandle, Inserter, LogicalTypeHandle, LogicalTypeId},
@@ -22,7 +22,7 @@ use std::{
 use chrono::Local;
 
 use crate::llm::{LLMClient, ColumnSchema};
-use crate::python_executor::{PythonExecutor, PyValue};
+use crate::deno_executor::{DenoExecutor, JsValue};
 
 // Global cache for LLM responses
 lazy_static::lazy_static! {
@@ -31,7 +31,7 @@ lazy_static::lazy_static! {
 
 #[derive(Clone)]
 struct CachedResponse {
-    python_code: String,
+    javascript_code: String,
     schema: Vec<ColumnSchema>,
     timestamp: chrono::DateTime<Local>,
 }
@@ -40,7 +40,7 @@ struct CachedResponse {
 struct WizardBindData {
     query: String,
     schema: Vec<ColumnSchema>,
-    data: Vec<HashMap<String, PyValue>>,
+    data: Vec<HashMap<String, JsValue>>,
 }
 
 #[repr(C)]
@@ -84,11 +84,11 @@ impl VTab for WizardVTab {
             None
         };
         
-        let (python_code, schema) = if let Some(cached) = cached_response {
+        let (javascript_code, schema) = if let Some(cached) = cached_response {
             if debug {
                 eprintln!("Using cached response for query: {}", query);
             }
-            (cached.python_code, cached.schema)
+            (cached.javascript_code, cached.schema)
         } else {
             // Initialize LLM client and get code + schema
             let llm_client = LLMClient::new()
@@ -100,13 +100,13 @@ impl VTab for WizardVTab {
             RESPONSE_CACHE.lock().unwrap().insert(
                 query.clone(),
                 CachedResponse {
-                    python_code: llm_response.python_code.clone(),
+                    javascript_code: llm_response.javascript_code.clone(),
                     schema: llm_response.schema.clone(),
                     timestamp: Local::now(),
                 }
             );
             
-            (llm_response.python_code, llm_response.schema)
+            (llm_response.javascript_code, llm_response.schema)
         };
         
         // Add columns based on the schema
@@ -121,9 +121,9 @@ impl VTab for WizardVTab {
             bind.add_result_column(&col.name, LogicalTypeHandle::from(logical_type));
         }
         
-        // Execute the Python code to get the data
-        let executor = PythonExecutor::new();
-        let data = executor.execute_code(&python_code, debug)?;
+        // Execute the JavaScript code to get the data
+        let executor = DenoExecutor::new();
+        let data = executor.execute_code(&javascript_code, debug)?;
         
         Ok(WizardBindData { 
             query,
@@ -161,7 +161,7 @@ impl VTab for WizardVTab {
                         let row = &bind_data.data[row_idx];
                         let value = row.get(&col_schema.name)
                             .and_then(|v| match v {
-                                PyValue::String(s) => Some(s.as_str()),
+                                JsValue::String(s) => Some(s.as_str()),
                                 _ => None,
                             })
                             .unwrap_or("");
@@ -176,8 +176,8 @@ impl VTab for WizardVTab {
                         let row = &bind_data.data[row_idx];
                         let value = row.get(&col_schema.name)
                             .and_then(|v| match v {
-                                PyValue::Float(f) => Some(*f),
-                                PyValue::Integer(i) => Some(*i as f64),
+                                JsValue::Float(f) => Some(*f),
+                                JsValue::Integer(i) => Some(*i as f64),
                                 _ => None,
                             })
                             .unwrap_or(0.0);
@@ -191,8 +191,8 @@ impl VTab for WizardVTab {
                         let row = &bind_data.data[row_idx];
                         let value = row.get(&col_schema.name)
                             .and_then(|v| match v {
-                                PyValue::Integer(i) => Some(*i),
-                                PyValue::Float(f) => Some(*f as i64),
+                                JsValue::Integer(i) => Some(*i),
+                                JsValue::Float(f) => Some(*f as i64),
                                 _ => None,
                             })
                             .unwrap_or(0);
@@ -205,11 +205,11 @@ impl VTab for WizardVTab {
                         let row = &bind_data.data[row_idx];
                         let value = row.get(&col_schema.name)
                             .map(|v| match v {
-                                PyValue::String(s) => s.clone(),
-                                PyValue::Float(f) => f.to_string(),
-                                PyValue::Integer(i) => i.to_string(),
-                                PyValue::Boolean(b) => b.to_string(),
-                                PyValue::None => "".to_string(),
+                                JsValue::String(s) => s.clone(),
+                                JsValue::Float(f) => f.to_string(),
+                                JsValue::Integer(i) => i.to_string(),
+                                JsValue::Boolean(b) => b.to_string(),
+                                JsValue::Null => "".to_string(),
                             })
                             .unwrap_or_else(|| "".to_string());
                         let c_str = CString::new(value)?;
