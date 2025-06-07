@@ -204,7 +204,13 @@ impl VTab for WizardVTab {
                     for (chunk_idx, row_idx) in (current_row..end_row).enumerate() {
                         let row = &bind_data.data[row_idx];
                         let value = row.get(&col_schema.name)
-                            .map(|v| format!("{:?}", v))
+                            .map(|v| match v {
+                                PyValue::String(s) => s.clone(),
+                                PyValue::Float(f) => f.to_string(),
+                                PyValue::Integer(i) => i.to_string(),
+                                PyValue::Boolean(b) => b.to_string(),
+                                PyValue::None => "".to_string(),
+                            })
                             .unwrap_or_else(|| "".to_string());
                         let c_str = CString::new(value)?;
                         output.flat_vector(col_idx).insert(chunk_idx, c_str);
