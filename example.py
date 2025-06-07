@@ -14,7 +14,7 @@ if not (os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')):
 conn = duckdb.connect(':memory:', config={'allow_unsigned_extensions': 'true'})
 
 # Load the wizard extension
-extension_path = os.path.join(os.path.dirname(__file__), 'build/release/rusty_quack.duckdb_extension')
+extension_path = os.path.join(os.path.dirname(__file__), 'build/release/wizard.duckdb_extension')
 conn.execute(f"LOAD '{extension_path}'")
 
 # Example queries
