@@ -81,12 +81,12 @@ git clone --recurse-submodules https://github.com/nicosuave/wizard
 cd wizard
 ```
 
-2. **Set your LLM API key**
+2. **Set your LLM API key** (you'll need one of these)
 ```bash
 # For OpenAI
 export OPENAI_API_KEY="your-openai-api-key"
 
-# OR for Anthropic  
+# OR for Anthropic (untested)
 export ANTHROPIC_API_KEY="your-anthropic-api-key"
 ```
 
