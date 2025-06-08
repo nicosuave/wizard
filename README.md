@@ -177,34 +177,6 @@ LOAD 'build/release/wizard.duckdb_extension';
 SELECT * FROM wizard('show me Tesla stock data for the last week');
 ```
 
-### Using from Python (via DuckDB)
-
-If you want to use the extension from Python, install DuckDB: `pip install duckdb`
-
-```python
-import duckdb
-
-# Connect with unsigned extensions allowed
-conn = duckdb.connect(':memory:', config={'allow_unsigned_extensions': 'true'})
-
-# Load the extension
-conn.execute("LOAD 'build/release/wizard.duckdb_extension'")
-
-# Query any data!
-df = conn.execute("SELECT * FROM wizard('cryptocurrency prices')").df()
-print(df)
-```
-
-### Using the demo script
-
-```bash
-# Interactive wizard interface
-python wizard.py
-
-# Or run the demo
-python wizard_demo.py
-```
-
 ## How it Works
 
 1. Your natural language query is sent to an LLM (OpenAI or Anthropic)
@@ -219,7 +191,6 @@ The extension leverages Deno's secure runtime and built-in fetch API, plus its a
 
 - **"No API key found"**: Set your OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable
 - **"Extension not found"**: Make sure you've built the extension with `make release`
-- **"Import error"**: The extension cannot import Python packages - this is by design
 - **Rate limits**: The extension uses real API calls, so you may hit rate limits with many queries
 - **Slow first query**: The first query calls the LLM API; subsequent identical queries use cache
 
