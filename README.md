@@ -26,10 +26,18 @@ cd wizard
 export OPENAI_API_KEY="your-api-key"  # or ANTHROPIC_API_KEY
 
 # Build the extension
-make release
+make build    # for debug build
+# OR
+make release  # for optimized build
 
 # Try it out!
-echo "SELECT * FROM wizard('bitcoin price')" | duckdb -unsigned -c "LOAD 'build/release/wizard.duckdb_extension'; $(cat)"
+duckdb -unsigned
+```
+
+Then in DuckDB:
+```sql
+LOAD 'build/release/wizard.duckdb_extension';
+SELECT * FROM wizard('bitcoin price');
 ```
 
 ## Examples
@@ -57,23 +65,23 @@ WHERE place LIKE '%California%'
 ORDER BY magnitude DESC;
 ```
 
-## Installation
+## Building from Source
 
-### 1. Requirements
+### Prerequisites
 
-- Deno runtime (for JavaScript execution)
 - Rust toolchain (for building)
+- Make
+- Git
 
+### Build Steps
+
+1. **Clone the repository**
 ```bash
-# Install Deno
-# macOS: brew install deno
-# Ubuntu: curl -fsSL https://deno.land/install.sh | sh
+git clone --recurse-submodules https://github.com/nicosuave/wizard
+cd wizard
 ```
 
-Note: The extension uses Deno for JavaScript execution with full npm package support!
-
-### 2. Set your LLM API key
-
+2. **Set your LLM API key**
 ```bash
 # For OpenAI
 export OPENAI_API_KEY="your-openai-api-key"
@@ -82,16 +90,41 @@ export OPENAI_API_KEY="your-openai-api-key"
 export ANTHROPIC_API_KEY="your-anthropic-api-key"
 ```
 
-### 3. Build the extension
+3. **Build the extension**
+```bash
+# Debug build (faster compilation, includes debug symbols)
+make build
+
+# OR Release build (optimized for performance)
+make release
+```
+
+The extension will be built to:
+- Debug: `build/debug/wizard.duckdb_extension`
+- Release: `build/release/wizard.duckdb_extension`
+
+### Running DuckDB with the Extension
+
+Always run DuckDB in unsigned mode to load custom extensions:
 
 ```bash
-# Clone with submodules
-git clone --recurse-submodules https://github.com/yourusername/duckdb-wizard
-cd duckdb-wizard
+# Start DuckDB in unsigned mode
+duckdb -unsigned
 
-# Configure and build
-make configure
-make release
+# Or with a database file
+duckdb -unsigned mydata.db
+```
+
+Then load the extension:
+```sql
+-- For release build
+LOAD 'build/release/wizard.duckdb_extension';
+
+-- Or for debug build
+LOAD 'build/debug/wizard.duckdb_extension';
+
+-- Now you can use it!
+SELECT * FROM wizard('current weather in Seattle');
 ```
 
 ## Technical Details
@@ -134,9 +167,13 @@ Responses are cached to improve performance:
 ### In DuckDB CLI
 
 ```bash
+# Start DuckDB in unsigned mode
 duckdb -unsigned
 
+# Load the extension (adjust path based on your build type)
 LOAD 'build/release/wizard.duckdb_extension';
+
+# Query away!
 SELECT * FROM wizard('show me Tesla stock data for the last week');
 ```
 
@@ -187,23 +224,6 @@ The extension leverages Deno's secure runtime and built-in fetch API, plus its a
 - **Slow first query**: The first query calls the LLM API; subsequent identical queries use cache
 
 ## Development
-
-### Requirements
-- Rust toolchain
-- Python 3.8+
-- Make
-- Git
-
-### Building from source
-```bash
-# Clone with submodules
-git clone --recurse-submodules https://github.com/yourusername/duckdb-wizard
-cd duckdb-wizard
-
-# Configure and build
-make configure
-make release
-```
 
 ### Testing
 ```bash
