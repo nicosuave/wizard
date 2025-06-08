@@ -32,9 +32,8 @@ try:
         print(f"{date:<15} {temp:<18.1f} {condition:<20}")
     
     print("-" * 60)
-    print("\n💡 Note: Due to PyO3 limitations, this generates realistic mock data")
-    print("   instead of making real API calls. For production use, consider")
-    print("   using a separate service for API calls.")
+    print("\n💡 Note: This uses the Wizard extension to fetch weather data")
+    print("   powered by an embedded JavaScript runtime with fetch() capabilities.")
     
 except Exception as e:
     print(f"❌ Error: {e}")

@@ -3,7 +3,7 @@ extern crate duckdb_loadable_macros;
 extern crate libduckdb_sys;
 
 mod llm;
-mod deno_executor;
+mod js_executor;
 
 use duckdb::{
     core::{DataChunkHandle, Inserter, LogicalTypeHandle, LogicalTypeId},
@@ -22,7 +22,7 @@ use std::{
 use chrono::Local;
 
 use crate::llm::{LLMClient, ColumnSchema};
-use crate::deno_executor::{DenoExecutor, JsValue};
+use crate::js_executor::{JsExecutor, JsValue};
 
 // Global cache for LLM responses
 lazy_static::lazy_static! {
@@ -122,7 +122,7 @@ impl VTab for WizardVTab {
         }
         
         // Execute the JavaScript code to get the data
-        let executor = DenoExecutor::new();
+        let executor = JsExecutor::new();
         let data = executor.execute_code(&javascript_code, debug)?;
         
         Ok(WizardBindData { 
@@ -232,9 +232,122 @@ impl VTab for WizardVTab {
 
 const EXTENSION_NAME: &str = env!("CARGO_PKG_NAME");
 
+#[repr(C)]
+struct JsBindData {
+    code: String,
+    data: Vec<HashMap<String, JsValue>>,
+}
+
+#[repr(C)]
+struct JsInitData {
+    current_row: std::sync::atomic::AtomicUsize,
+}
+
+struct JsVTab;
+
+impl VTab for JsVTab {
+    type InitData = JsInitData;
+    type BindData = JsBindData;
+
+    fn bind(bind: &BindInfo) -> Result<Self::BindData, Box<dyn std::error::Error>> {
+        let code = bind.get_parameter(0).to_string();
+        
+        // Execute the JavaScript code
+        let executor = JsExecutor::new();
+        let data = executor.execute_code(&code, false)?;
+        
+        // Infer schema from first row if any
+        if let Some(first_row) = data.first() {
+            for (col_name, value) in first_row {
+                let logical_type = match value {
+                    JsValue::String(_) => LogicalTypeId::Varchar,
+                    JsValue::Float(_) => LogicalTypeId::Double,
+                    JsValue::Integer(_) => LogicalTypeId::Bigint,
+                    JsValue::Boolean(_) => LogicalTypeId::Boolean,
+                    JsValue::Null => LogicalTypeId::Varchar,
+                };
+                bind.add_result_column(col_name, LogicalTypeHandle::from(logical_type));
+            }
+        }
+        
+        Ok(JsBindData { code, data })
+    }
+
+    fn init(_: &InitInfo) -> Result<Self::InitData, Box<dyn std::error::Error>> {
+        Ok(JsInitData {
+            current_row: std::sync::atomic::AtomicUsize::new(0),
+        })
+    }
+
+    fn func(func: &TableFunctionInfo<Self>, output: &mut DataChunkHandle) -> Result<(), Box<dyn std::error::Error>> {
+        let init_data = func.get_init_data();
+        let bind_data = func.get_bind_data();
+        
+        let current_row = init_data.current_row.load(Ordering::Relaxed);
+        
+        if current_row >= bind_data.data.len() {
+            output.set_len(0);
+            return Ok(());
+        }
+        
+        let chunk_size = std::cmp::min(2048, bind_data.data.len() - current_row);
+        let end_row = current_row + chunk_size;
+        
+        // Get column names from the first row
+        if let Some(first_row) = bind_data.data.first() {
+            let columns: Vec<_> = first_row.keys().collect();
+            
+            for (col_idx, col_name) in columns.iter().enumerate() {
+                for (chunk_idx, row_idx) in (current_row..end_row).enumerate() {
+                    let row = &bind_data.data[row_idx];
+                    if let Some(value) = row.get(*col_name) {
+                        match value {
+                            JsValue::String(s) => {
+                                let c_str = CString::new(s.as_str())?;
+                                output.flat_vector(col_idx).insert(chunk_idx, c_str);
+                            },
+                            JsValue::Float(f) => {
+                                let mut vec = output.flat_vector(col_idx);
+                                let slice = vec.as_mut_slice::<f64>();
+                                slice[chunk_idx] = *f;
+                            },
+                            JsValue::Integer(i) => {
+                                let mut vec = output.flat_vector(col_idx);
+                                let slice = vec.as_mut_slice::<i64>();
+                                slice[chunk_idx] = *i;
+                            },
+                            JsValue::Boolean(b) => {
+                                let c_str = CString::new(b.to_string())?;
+                                output.flat_vector(col_idx).insert(chunk_idx, c_str);
+                            },
+                            JsValue::Null => {
+                                let c_str = CString::new("")?;
+                                output.flat_vector(col_idx).insert(chunk_idx, c_str);
+                            },
+                        }
+                    }
+                }
+            }
+        }
+        
+        output.set_len(chunk_size);
+        init_data.current_row.store(end_row, Ordering::Relaxed);
+        
+        Ok(())
+    }
+
+    fn parameters() -> Option<Vec<LogicalTypeHandle>> {
+        Some(vec![LogicalTypeHandle::from(LogicalTypeId::Varchar)])
+    }
+}
+
 #[duckdb_entrypoint_c_api()]
 pub unsafe fn extension_entrypoint(con: Connection) -> Result<(), Box<dyn Error>> {
     con.register_table_function::<WizardVTab>("wizard")
         .expect("Failed to register wizard table function");
+    con.register_table_function::<WizardVTab>("wiz")
+        .expect("Failed to register wiz table function");
+    con.register_table_function::<JsVTab>("js")
+        .expect("Failed to register js table function");
     Ok(())
 }
