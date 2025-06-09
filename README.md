@@ -2,7 +2,7 @@
 
 Did you ever want to `SELECT * FROM clean_data_you_think_exists`? Well, now you can!
 
-A DuckDB extension that lets you query any data using natural language.
+A DuckDB extension that lets you query any data using natural language or run arbitrary JavaScript code directly in your SQL queries.
 
 > ⚠️ **WARNING: HIGHLY EXPERIMENTAL** ⚠️
 > 
@@ -13,7 +13,7 @@ A DuckDB extension that lets you query any data using natural language.
 > - API calls to LLMs incur costs - monitor your usage
 > - Proceed at your own risk!
 
-Query any data using natural language in DuckDB! Powered by LLMs (OpenAI/Anthropic) and Deno.
+Query any data using natural language in DuckDB, or execute JavaScript code directly! Powered by LLMs (OpenAI/Anthropic) and Deno.
 
 ## Quick Start
 
@@ -63,6 +63,34 @@ SELECT magnitude, place, time
 FROM wizard('earthquakes magnitude > 5.0 past week')
 WHERE place LIKE '%California%'
 ORDER BY magnitude DESC;
+
+-- Run arbitrary JavaScript code directly!
+SELECT * FROM js('
+async function fetch_data() {
+    // You can use any JavaScript here, including npm packages
+    const response = await fetch("https://api.github.com/repos/duckdb/duckdb");
+    const data = await response.json();
+    return [{
+        name: data.name,
+        stars: data.stargazers_count,
+        language: data.language
+    }];
+}
+');
+
+-- Use npm packages in your JavaScript
+SELECT * FROM js('
+import dayjs from "npm:dayjs";
+
+async function fetch_data() {
+    const now = dayjs();
+    return [{
+        current_time: now.format(),
+        unix_timestamp: now.unix(),
+        day_of_week: now.format("dddd")
+    }];
+}
+');
 ```
 
 ## Building from Source
@@ -176,6 +204,54 @@ LOAD 'build/release/wizard.duckdb_extension';
 # Query away!
 SELECT * FROM wizard('show me Tesla stock data for the last week');
 ```
+
+### Direct JavaScript Execution with js()
+
+You can also execute JavaScript code directly without going through an LLM:
+
+```sql
+-- Simple example
+SELECT * FROM js('
+async function fetch_data() {
+    return [
+        { message: "Hello from JavaScript!", value: 42 }
+    ];
+}
+');
+
+-- Fetch data from APIs
+SELECT * FROM js('
+async function fetch_data() {
+    const response = await fetch("https://api.coinbase.com/v2/exchange-rates?currency=BTC");
+    const data = await response.json();
+    return [{
+        currency: "BTC",
+        usd_price: parseFloat(data.data.rates.USD),
+        timestamp: new Date().toISOString()
+    }];
+}
+');
+
+-- Use npm packages
+SELECT * FROM js('
+import { format } from "npm:date-fns";
+
+async function fetch_data() {
+    const dates = ["2024-01-01", "2024-06-15", "2024-12-25"];
+    return dates.map(date => ({
+        original: date,
+        formatted: format(new Date(date), "MMMM do, yyyy"),
+        day_of_week: format(new Date(date), "EEEE")
+    }));
+}
+');
+```
+
+The `js()` function:
+- Executes arbitrary JavaScript/TypeScript code
+- Has access to Deno's fetch API and npm packages
+- Must define an async `fetch_data()` function that returns an array of objects
+- Runs in the same sandboxed Deno environment as wizard-generated code
 
 ## How it Works
 
